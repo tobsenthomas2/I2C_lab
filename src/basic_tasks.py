@@ -14,6 +14,8 @@ import gc
 import pyb
 import cotask
 import task_share
+from mma_syd import MMA845x
+mma = MMA845x(pyb.I2C(1,pyb.I2C.CONTROLLER), 29,0)
 
 
 def task1_fun(shares):
@@ -26,11 +28,17 @@ def task1_fun(shares):
 
     counter = 0
     while True:
+        
         my_share.put(counter)
         my_queue.put(counter)
         counter += 1
 
-        yield 0
+        x = mma.get_ax()
+        
+
+        print(x)
+        yield x
+        #yield 0
 
 
 def task2_fun(shares):
@@ -67,12 +75,12 @@ if __name__ == "__main__":
     # allocated for state transition tracing, and the application will run out
     # of memory after a while and quit. Therefore, use tracing only for 
     # debugging and set trace to False when it's not needed
-    task1 = cotask.Task(task1_fun, name="Task_1", priority=1, period=400,
+    task1 = cotask.Task(task1_fun, name="Task_1", priority=1, period=500,
                         profile=True, trace=False, shares=(share0, q0))
-    task2 = cotask.Task(task2_fun, name="Task_2", priority=2, period=1500,
-                        profile=True, trace=False, shares=(share0, q0))
+    #task2 = cotask.Task(task2_fun, name="Task_2", priority=2, period=1500,
+    #                    profile=True, trace=False, shares=(share0, q0))
     cotask.task_list.append(task1)
-    cotask.task_list.append(task2)
+    #cotask.task_list.append(task2)
 
     # Run the memory garbage collector to ensure memory is as defragmented as
     # possible before the real-time scheduler is started

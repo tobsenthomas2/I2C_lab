@@ -9,6 +9,7 @@ an exercise in a mechatronics course.
 """
 
 import micropython
+import pyb
 # data is stored as 2’s complement 14-bit numbers
 
 ## The register address of the STATUS register in the MMA845x
@@ -87,7 +88,7 @@ class MMA845x:
     The example code works for an MMA8452 on a SparkFun<sup>TM</sup> breakout
     board. """
 
-    def __init__ (self, i2c, address, accel_range = 0):
+    def __init__ (self, i2c, address, accel_range):
         """! Initialize an MMA845x driver on the given I<sup>2</sup>C bus. The 
         I<sup>2</sup>C bus object must have already been initialized, as we're
         going to use it to get the accelerometer's WHO_AM_I code right away. 
@@ -107,10 +108,11 @@ class MMA845x:
         """
 
         ## The I2C driver which was created by the code which called this
-        self.i2c = i2c
+        print("init ")
+        self.i2c = pyb.I2C(1,pyb.I2C.CONTROLLER)
 
         ## The I2C bus address at which the accelerometer is located
-        self.addr = address
+        self.addr = 29
         
         ##set up accelerometer range?
         self.accel_range = RANGE_2g
@@ -119,6 +121,8 @@ class MMA845x:
         
         #WHO_AM_I (add self's in front?)  (i changed this)
         self._dev_id = ord(self.i2c.mem_read (1, self.addr, WHO_AM_I)) #bus address, internal address
+        
+        #self._dev_id = ord (i2c.mem_read (1, address, WHO_AM_I))
 
         # The WHO_AM_I codes from MMA8451Q's and MMA8452Q's are recognized
         # The default value is 0x1A
@@ -132,15 +136,19 @@ class MMA845x:
         # Ensure the accelerometer is in standby mode so we can configure it
         #SYSMOD = 00, set CTRL_REG1 (?)
         #I think this is default, but:
-        SYSMOD = micropython.const(0x0B)
+        #SYSMOD = micropython.const(0x0B)
         
         self.standby()
         
 
         # Set the acceleration range to the given one if it's legal
         self.set_range(self.accel_range)
-
-
+        
+    def set_range(self, accel_range):
+        if accel_range != micropython.const(0) | micropython.const(1) | micropython.const(2):
+            print("uh oh")
+        else:
+            print(accel_range)
     def active (self):
         """! Put the MMA845x into active mode so that it takes data. In active
         mode, the accelerometer's settings can't be messed with. Active mode
@@ -159,9 +167,9 @@ class MMA845x:
         be made, one must call @c active(). """
 
         if self._works:
-            reg1 = ord (self._i2c.mem_read (1, self._addr, CTRL_REG1)) #bus address, internal address
+            reg1 = ord (self.i2c.mem_read (1, self.addr, CTRL_REG1)) #bus address, internal address
             reg1 &= ~0x01
-            self._i2c.mem_write (chr (reg1 & 0xFF), self._addr, CTRL_REG1)
+            self.i2c.mem_write (chr (reg1 & 0xFF), self.addr, CTRL_REG1)
 
 
     def get_ax_bits (self):
@@ -171,17 +179,26 @@ class MMA845x:
         #reads two bytes from register address
         #accel address, then register address
         #i think we only need MSB
-        accel_x_high = 0
-        accel_x_low = 0
+
+        #set active mode
+        self.active()
+        accel_x_high = self.i2c.mem_read(2, self.addr, OUT_X_MSB)
+        #read data from MSB?
+        accel_x_low = self.i2c.mem_read(2, self.addr, OUT_X_LSB)
         
-        accel_x_high = ord(self.i2c.mem_read (1, self.addr, OUT_X_MSB))
-        accel_x_low = ord(self.i2c.mem_read (1, self.addr, OUT_X_LSB))
         #shift the high over by 8 then add the low byte
-        accel_x = (accel_x_high << 8) + accel_low
+        #accel_x = (accel_x_high << 8) + accel_low
         #converts to integer
-        ax_bits = int.from_bytes(accel_x)
+        #need to ignore the last two bits of data b/c they're 0's
         
-        return ax_bits  if ax_bits < 32768 else ax_bits - 65536
+        ax_bits = int.from_bytes(accel_x_high , 'high')
+        #ax_bits_new = ax_bits >> 2
+        
+        #print(ax_bits)
+        if ax_bits < (65536/2):
+            pass
+        else: ax_bits -= 65536
+        return ax_bits  #if ax_bits < 32768 else ax_bits - 65536
 
     def get_ay_bits (self):
         """! Get the Y acceleration from the accelerometer in A/D bits and 
@@ -206,13 +223,14 @@ class MMA845x:
         that the accelerometer was correctly calibrated at the factory.
         @return The measured X acceleration in g's
         
-        As the range is -2 to +2, this would be a total of 4g.  Or 4,000 Milli-Gs.
+        As the range is -1 to +1, this would be a total of 2g.  Or 2,000 Milli-Gs.
         The output is 16 bits. 16 bits equals 65,535.   This means we can get 65,535
         different readings for the range  between -2 and +2. (or -2,000 MilliGs and +2,000 MilliGs)
-        4,000 MilliGs / 65,535 = 0.061
-        Each time the LSB changes by one, the value changes by 0.061"""
+        2,000 MilliGs / 65,535 = 0.0305
+        Each time the LSB changes by one, the value changes by 0.0305"""
+        #16384 for 14 bits
         
-        x_g = (self.get_ax_bits() * 0.061)/ 1000
+        x_g = ((self.get_ax_bits()))
 
         #print ('MMA845x uncalibrated X')
         return(x_g)

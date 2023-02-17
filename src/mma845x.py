@@ -9,6 +9,8 @@ an exercise in a mechatronics course.
 """
 
 import micropython
+import pyb
+
 
 
 ## The register address of the STATUS register in the MMA845x
