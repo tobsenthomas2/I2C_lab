@@ -117,13 +117,10 @@ class MMA845x:
         ##set up accelerometer range?
         self.accel_range = RANGE_2g
 
-        # Request the WHO_AM_I device ID byte from the accelerometer
+        # Request the WHO_AM_I device ID byte from the accelerometer        
+        self._dev_id = ord (i2c.mem_read (1, address, WHO_AM_I))
+        #self._dev_id = ord(self.i2c.mem_read (1, self.addr, WHO_AM_I)) #bus address, internal address
         
-        #WHO_AM_I (add self's in front?)  (i changed this)
-        self._dev_id = ord(self.i2c.mem_read (1, self.addr, WHO_AM_I)) #bus address, internal address
-        
-        #self._dev_id = ord (i2c.mem_read (1, address, WHO_AM_I))
-
         # The WHO_AM_I codes from MMA8451Q's and MMA8452Q's are recognized
         # The default value is 0x1A
         if self._dev_id == 0x1A or self._dev_id == 0x2A:
@@ -179,27 +176,16 @@ class MMA845x:
         #reads two bytes from register address
         #accel address, then register address
         #i think we only need MSB
-
         #set active mode
+        
         self.active()
-        accel_x_high = self.i2c.mem_read(2, self.addr, OUT_X_MSB)
-        #read data from MSB?
-        accel_x_low = self.i2c.mem_read(2, self.addr, OUT_X_LSB)
         
-        #shift the high over by 8 then add the low byte
-        #accel_x = (accel_x_high << 8) + accel_low
-        #converts to integer
-        #need to ignore the last two bits of data b/c they're 0's
+        accel_x_hi = self.i2c.mem_read(2, self.addr, OUT_X_MSB)
+        #accel_x_hi is a byte array 
         
-        ax_bits = int.from_bytes(accel_x_high , 'high')
-        #ax_bits_new = ax_bits >> 2
-        
-        #print(ax_bits)
-        if ax_bits < (65536/2):
-            pass
-        else: ax_bits -= 65536
-        return ax_bits  #if ax_bits < 32768 else ax_bits - 65536
-
+        return (accel_x_hi)
+       
+    
     def get_ay_bits (self):
         """! Get the Y acceleration from the accelerometer in A/D bits and 
         return it.
@@ -229,11 +215,18 @@ class MMA845x:
         2,000 MilliGs / 65,535 = 0.0305
         Each time the LSB changes by one, the value changes by 0.0305"""
         #16384 for 14 bits
+        x_data = self.get_ax_bits()
+        MSB = int.from_bytes(x_data, 'big', True)
         
-        x_g = ((self.get_ax_bits()))
-
-        #print ('MMA845x uncalibrated X')
-        return(x_g)
+        if MSB < 32768:
+            ax_bits = MSB
+        else:
+            ax_bits = MSB - 65536
+            
+        #MSB = int.from_bytes(x_data, 'big', True)
+            
+        ax_bits_new = ax_bits/17000
+        return(ax_bits_new)
 
 
     def get_ay (self):
