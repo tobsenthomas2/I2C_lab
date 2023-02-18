@@ -28,18 +28,13 @@ def task1_fun(shares):
 
     counter = 0
     while True:
-        #mma = MMA845x(pyb.I2C(1,pyb.I2C.CONTROLLER, baudrate = 100000), 29,0)
-
-        my_share.put(counter)
-        my_queue.put(counter)
-        counter += 1
         mma.active()
-        x = mma.get_ax()
-        
-
-        print(x)
-        yield x
-        #yield 0
+        my_share.put(counter)
+        #my_queue.put(counter)
+        counter += 1
+        if not my_queue.full ():
+            my_share.put ((mma.get_ax()))
+        yield 0
 
 
 def task2_fun(shares):
@@ -52,10 +47,8 @@ def task2_fun(shares):
 
     while True:
         # Show everything currently in the queue and the value in the share
-        print(f"Share: {the_share.get ()}, Queue: ", end='')
-        while q0.any():
-            print(f"{the_queue.get ()} ", end='')
-        print('')
+        print(f"x acceleration: {the_share.get ()}", end='')
+        print("")
 
         yield 0
 
@@ -68,8 +61,8 @@ if __name__ == "__main__":
           "Press Ctrl-C to stop and show diagnostics.")
 
     # Create a share and a queue to test function and diagnostic printouts
-    share0 = task_share.Share('h', thread_protect=False, name="Share 0")
-    q0 = task_share.Queue('L', 16, thread_protect=False, overwrite=False,
+    share0 = task_share.Share('f', thread_protect=False, name="Share 0")
+    q0 = task_share.Queue('f', 16, thread_protect=False, overwrite=False,
                           name="Queue 0")
 
     # Create the tasks. If trace is enabled for any task, memory will be
@@ -78,10 +71,10 @@ if __name__ == "__main__":
     # debugging and set trace to False when it's not needed
     task1 = cotask.Task(task1_fun, name="Task_1", priority=1, period=500,
                         profile=True, trace=False, shares=(share0, q0))
-    #task2 = cotask.Task(task2_fun, name="Task_2", priority=2, period=1500,
-    #                    profile=True, trace=False, shares=(share0, q0))
+    task2 = cotask.Task(task2_fun, name="Task_2", priority=2, period=500,
+                        profile=True, trace=False, shares=(share0, q0))
     cotask.task_list.append(task1)
-    #cotask.task_list.append(task2)
+    cotask.task_list.append(task2)
 
     # Run the memory garbage collector to ensure memory is as defragmented as
     # possible before the real-time scheduler is started
